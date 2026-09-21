@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>JSX Detective 🕵️</title>
+<style>
+  :root { --bg:#0b1220; --panel:#131c31; --p2:#1a2540; --tx:#e6eaf5; --su:#8b93ad; --cy:#61dafb; --ve:#34d399; --ro:#fb7185; --am:#fbbf24; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--tx); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; display:grid; place-items:center; padding:16px; }
+  .app { width:100%; max-width:720px; }
+  h1 { margin:0 0 4px; font-size:28px; } .sub { color:var(--su); margin:0 0 16px; }
+  .hud { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .chip { background:var(--panel); padding:8px 14px; border-radius:999px; font-size:14px; }
+  .chip b { color:var(--am); }
+  .barra { height:8px; background:var(--panel); border-radius:99px; overflow:hidden; margin-bottom:16px; }
+  .barra i { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--cy),#a78bfa,#f472b6); transition:width .3s; }
+  .card { background:var(--panel); border-radius:18px; padding:22px; }
+  .tag { color:#a78bfa; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+  .q { font-size:19px; margin:8px 0 14px; }
+  pre { background:#0a0f1c; color:#c3e88d; padding:16px; border-radius:12px; overflow:auto; font-size:15px; line-height:1.5; margin:0 0 16px; white-space:pre-wrap; }
+  .btns { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  button { font:inherit; border:0; border-radius:14px; padding:14px; cursor:pointer; color:#04120c; font-weight:700; font-size:16px; }
+  .si { background:var(--ve); } .no { background:var(--ro); color:#2a0610; }
+  button:disabled { opacity:.45; cursor:default; }
+  .fb { margin-top:16px; padding:14px 16px; border-radius:12px; font-size:15px; line-height:1.5; }
+  .fb.ok { background:#10281f; border:1px solid var(--ve); } .fb.mal { background:#2a121a; border:1px solid var(--ro); }
+  .fb code, .fb pre { color:var(--cy); }
+  .fb pre { margin:8px 0 0; padding:10px 12px; font-size:14px; }
+  .next { background:var(--cy); margin-top:14px; width:100%; }
+  .fin { text-align:center; } .fin .big { font-size:56px; margin:6px 0; } .fin h2 { margin:0 0 6px; }
+  .hide { display:none; }
+  @media (max-width:480px){ .btns{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🕵️ JSX Detective</h1>
+  <p class="sub">Semana 1 · ¿Este código respeta las reglas de JSX y React? Decidí rápido y justificá.</p>
+  <div class="hud"><span class="chip">Pregunta <b id="n">1</b>/<span id="t"></span></span><span class="chip">Puntos <b id="pts">0</b></span><span class="chip">Racha 🔥 <b id="racha">0</b></span></div>
+  <div class="barra"><i id="prog"></i></div>
+
+  <div class="card" id="juego">
+    <div class="tag" id="tag"></div>
+    <div class="q" id="q"></div>
+    <pre id="code"></pre>
+    <div class="btns">
+      <button class="si" id="bsi">✅ <span id="lsi"></span></button>
+      <button class="no" id="bno">❌ <span id="lno"></span></button>
+    </div>
+    <div class="fb hide" id="fb"></div>
+    <button class="next hide" id="next">Siguiente →</button>
+  </div>
+
+  <div class="card fin hide" id="fin">
+    <div class="big" id="emoji">🏆</div>
+    <h2 id="rango"></h2>
+    <p id="res"></p>
+    <button class="next" onclick="empezar()">↺ Jugar de nuevo (preguntas mezcladas)</button>
+  </div>
+</div>
+
+<script>
+const PREGUNTAS = [
+  { tipo:'jsx', q:'¿Este componente respeta las reglas de JSX?', code:'function App() {\n  return (\n    <h1>Hola</h1>\n    <p>Mundo</p>\n  );\n}', ok:false,
+    exp:'Un componente solo puede devolver <b>un elemento raíz</b>. Envolvelos en un <code>&lt;div&gt;</code> o en un Fragment.', fix:'return (\n  <>\n    <h1>Hola</h1>\n    <p>Mundo</p>\n  </>\n);' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<img src="foto.png" alt="Yo" />', ok:true,
+    exp:'Correcto: las etiquetas sin contenido se <b>auto-cierran</b> con <code>/&gt;</code>.' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<div class="caja">Hola</div>', ok:false,
+    exp:'<code>class</code> es una palabra reservada de JavaScript. En JSX se escribe <b>className</b>.', fix:'<div className="caja">Hola</div>' },
+  { tipo:'jsx', q:'¿Qué hace esto? ¿Es JSX correcto?', code:'<p>Resultado: {2 + 2}</p>', ok:true,
+    exp:'Correcto: dentro de las llaves va una <b>expresión</b> de JavaScript. Muestra “Resultado: 4”.' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<p>{ if (activo) { "Sí" } }</p>', ok:false,
+    exp:'Un <code>if</code> es una <b>sentencia</b>, no una expresión: no entra en las llaves. Usá un ternario.', fix:'<p>{ activo ? "Sí" : "No" }</p>' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<input type="text">', ok:false,
+    exp:'En JSX <b>todas las etiquetas se cierran</b>, incluso las que en HTML no lo necesitan.', fix:'<input type="text" />' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<label htmlFor="mail">Email</label>\n<input id="mail" />', ok:true,
+    exp:'Correcto: <code>for</code> de HTML se escribe <b>htmlFor</b> en JSX.' },
+  { tipo:'jsx', q:'Este componente se usa así: <boton />. ¿Funciona?', code:'function boton() {\n  return <button>Click</button>;\n}\n\n<boton />', ok:false,
+    exp:'Los componentes <b>empiezan con mayúscula</b>. Con minúscula React piensa que es una etiqueta HTML inventada.', fix:'function Boton() {\n  return <button>Click</button>;\n}\n\n<Boton />' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<p style={{ color: "red", fontSize: 24 }}>Oferta</p>', ok:true,
+    exp:'Correcto: el estilo inline recibe un <b>objeto</b> (por eso las dos llaves) con propiedades en camelCase.' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<p style="color: red">Oferta</p>', ok:false,
+    exp:'En React <code>style</code> recibe un <b>objeto</b>, no un string como en HTML.', fix:'<p style={{ color: "red" }}>Oferta</p>' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'return (\n  <>\n    <h1>A</h1>\n    <p>B</p>\n  </>\n);', ok:true,
+    exp:'Correcto: el <b>Fragment</b> <code>&lt;&gt; … &lt;/&gt;</code> agrupa sin agregar nada al HTML.' },
+  { tipo:'jsx', q:'¿Funciona?', code:'const persona = { nombre: "Ana" };\n\n<p>{persona}</p>', ok:false,
+    exp:'React no sabe dibujar un objeto completo (“Objects are not valid as a React child”). Mostrá una propiedad.', fix:'<p>{persona.nombre}</p>' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'<button onclick={saludar}>Hola</button>', ok:false,
+    exp:'Los eventos van en camelCase: <b>onClick</b>. Con minúscula React avisa que no lo reconoce.', fix:'<button onClick={saludar}>Hola</button>' },
+  { tipo:'jsx', q:'¿Es JSX correcto?', code:'const nombre = "ana";\n\n<p>Hola {nombre.toUpperCase()}</p>', ok:true,
+    exp:'Correcto: podés llamar métodos dentro de las llaves. Muestra “Hola ANA”.' },
+  { tipo:'concepto', q:'“React es un lenguaje de programación nuevo, distinto de JavaScript.”', code:'', ok:false,
+    exp:'React es una <b>librería de JavaScript</b> para construir interfaces con componentes.' },
+  { tipo:'concepto', q:'“Con React describimos cómo debe verse la interfaz y React se ocupa de actualizarla (enfoque declarativo).”', code:'', ok:true,
+    exp:'Exacto: <b>declarativo</b> = describís el resultado, no los pasos.' },
+  { tipo:'concepto', q:'“Para crear un proyecto con Vite hay que abrir el navegador e instalar un programa gráfico.”', code:'npm create vite@latest mi-app -- --template react', ok:false,
+    exp:'Se crea desde la <b>terminal</b> con un comando (mirá el código de arriba). Después: <code>cd mi-app</code>, <code>npm install</code> y <code>npm run dev</code>.' },
+  { tipo:'concepto', q:'“Create React App (CRA) sigue siendo la opción recomendada para empezar un proyecto nuevo hoy.”', code:'', ok:false,
+    exp:'CRA fue <b>deprecado en febrero de 2025</b> y ya no tiene mantenimiento activo. Hoy se usa <b>Vite</b> (o un framework).' },
+  { tipo:'concepto', q:'“Un componente de React funcional es simplemente una función que devuelve JSX.”', code:'', ok:true,
+    exp:'Así es. Con nombre en <b>Mayúscula</b> y, si está en otro archivo, con <code>export default</code>.' },
+];
+
+let orden, i, pts, racha, aciertos, respondida;
+const $ = id => document.getElementById(id);
+const mezclar = a => a.map(x => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+
+function empezar() {
+  orden = mezclar(PREGUNTAS); i = 0; pts = 0; racha = 0; aciertos = 0;
+  $('t').textContent = orden.length;
+  $('fin').classList.add('hide'); $('juego').classList.remove('hide');
+  mostrar();
+}
+function mostrar() {
+  const p = orden[i]; respondida = false;
+  $('n').textContent = i + 1; $('pts').textContent = pts; $('racha').textContent = racha;
+  $('prog').style.width = (i / orden.length * 100) + '%';
+  $('tag').textContent = p.tipo === 'jsx' ? '🔎 Analizá el código' : '🧠 Verdadero o falso';
+  $('q').textContent = p.q;
+  $('code').textContent = p.code; $('code').classList.toggle('hide', !p.code);
+  $('lsi').textContent = p.tipo === 'jsx' ? 'Correcto' : 'Verdadero';
+  $('lno').textContent = p.tipo === 'jsx' ? 'Tiene un error' : 'Falso';
+  $('bsi').disabled = $('bno').disabled = false;
+  $('fb').classList.add('hide'); $('next').classList.add('hide');
+}
+function responder(dijoSi) {
+  if (respondida) return; respondida = true;
+  const p = orden[i], acerto = dijoSi === p.ok;
+  if (acerto) { racha++; aciertos++; pts += 10 + Math.min(racha - 1, 5) * 2; } else racha = 0;
+  $('pts').textContent = pts; $('racha').textContent = racha;
+  $('bsi').disabled = $('bno').disabled = true;
+  const fb = $('fb');
+  fb.className = 'fb ' + (acerto ? 'ok' : 'mal');
+  fb.innerHTML = (acerto ? '🎉 <b>¡Bien!</b> ' : '🤔 <b>Ojo.</b> ') + p.exp + (p.fix ? '<pre></pre>' : '');
+  if (p.fix) fb.querySelector('pre').textContent = p.fix;
+  $('next').textContent = i === orden.length - 1 ? 'Ver resultado 🏁' : 'Siguiente →';
+  $('next').classList.remove('hide');
+}
+function siguiente() {
+  if (i === orden.length - 1) return fin();
+  i++; mostrar();
+}
+function fin() {
+  $('prog').style.width = '100%';
+  $('juego').classList.add('hide'); $('fin').classList.remove('hide');
+  const pc = aciertos / orden.length;
+  const r = pc >= .9 ? ['🏆', 'Detective legendario'] : pc >= .7 ? ['🕵️', 'Detective de campo'] : pc >= .5 ? ['🔍', 'Detective en formación'] : ['📚', 'Aprendiz: ¡a repasar y reintentar!'];
+  $('emoji').textContent = r[0]; $('rango').textContent = r[1];
+  $('res').textContent = `${aciertos} de ${orden.length} correctas · ${pts} puntos`;
+}
+$('bsi').onclick = () => responder(true); $('bno').onclick = () => responder(false); $('next').onclick = siguiente;
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === '1') responder(true);
+  if (e.key === 'ArrowRight' || e.key === '2') responder(false);
+  if ((e.key === 'Enter' || e.key === ' ') && respondida && !$('fin').offsetParent && document.activeElement.tagName !== 'BUTTON') { e.preventDefault(); siguiente(); }
+});
+empezar();
+</script>
+</body>
+</html>
